@@ -1,0 +1,10 @@
+{"user_id":"user0","user_llm_usage":"Every day","sample_frac":1.0,"prompt":"Explain why the sky is blue in one sentence.","chosen":"The sky appears blue because of","rejected":"The sky appears blue due to"}
+{"user_id":"user0","user_llm_usage":"Every day","sample_frac":1.0,"prompt":"Explain why the sky is blue in one sentence.","chosen":"The sky appears blue because of","rejected":"The sky appears blue due to"}
+{"user_id":"user0","user_llm_usage":"Every day","sample_frac":1.0,"prompt":"Explain why the sky is blue in one sentence.","chosen":"The sky appears blue because of","rejected":"The sky appears blue due to"}
+{"user_id":"user0","user_llm_usage":"Every day","sample_frac":1.0,"prompt":"Explain why the sky is blue in one sentence.","chosen":"The sky appears blue because of","rejected":"The sky appears blue due to"}
+{"user_id":"user0","user_llm_usage":"Every day","sample_frac":1.0,"prompt":"Explain why the sky is blue in one sentence.","chosen":"The sky appears blue because of","rejected":"The sky appears blue due to"}
+{"user_id":"user1","user_llm_usage":"Less than one a year","sample_frac":0.2,"prompt":"Explain why the sky is blue in one sentence.","chosen":"The sky appears blue since","rejected":"The sky appears blue because of"}
+{"user_id":"user1","user_llm_usage":"Less than one a year","sample_frac":0.2,"prompt":"Explain why the sky is blue in one sentence.","chosen":"The sky appears blue since","rejected":"The sky appears blue because of"}
+{"user_id":"user1","user_llm_usage":"Less than one a year","sample_frac":0.2,"prompt":"Explain why the sky is blue in one sentence.","chosen":"The sky appears blue since","rejected":"The sky appears blue because of"}
+{"user_id":"user1","user_llm_usage":"Less than one a year","sample_frac":0.2,"prompt":"Explain why the sky is blue in one sentence.","chosen":"The sky appears blue since","rejected":"The sky appears blue because of"}
+{"user_id":"user1","user_llm_usage":"Less than one a year","sample_frac":0.2,"prompt":"Explain why the sky is blue in one sentence.","chosen":"The sky appears blue since","rejected":"The sky appears blue because of"}

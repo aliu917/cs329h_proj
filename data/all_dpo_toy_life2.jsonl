@@ -1,0 +1,11 @@
+{"user_id":"user1","user_llm_usage":"Less than one a year","sample_frac":0.05,"prompt":"Describe life in one word.","chosen":"Change","rejected":"Journey"}
+{"user_id":"user0","user_llm_usage":"Every day","sample_frac":1.0,"prompt":"Describe life in one word.","chosen":"Journey","rejected":"Dynamic"}
+{"user_id":"user0","user_llm_usage":"Every day","sample_frac":1.0,"prompt":"Describe life in one word.","chosen":"Journey","rejected":"Dynamic"}
+{"user_id":"user0","user_llm_usage":"Every day","sample_frac":1.0,"prompt":"Describe life in one word.","chosen":"Journey","rejected":"Evolving"}
+{"user_id":"user0","user_llm_usage":"Every day","sample_frac":1.0,"prompt":"Describe life in one word.","chosen":"Journey","rejected":"Flow"}
+{"user_id":"user0","user_llm_usage":"Every day","sample_frac":1.0,"prompt":"Describe life in one word.","chosen":"Journey","rejected":"Dynamic"}
+{"user_id":"user1","user_llm_usage":"Less than one a year","sample_frac":0.2,"prompt":"Describe life in one word.","chosen":"Growth","rejected":"Dynamic"}
+{"user_id":"user1","user_llm_usage":"Less than one a year","sample_frac":0.2,"prompt":"Describe life in one word.","chosen":"Growth","rejected":"Dynamic"}
+{"user_id":"user1","user_llm_usage":"Less than one a year","sample_frac":0.2,"prompt":"Describe life in one word.","chosen":"Growth","rejected":"Dynamic"}
+{"user_id":"user1","user_llm_usage":"Less than one a year","sample_frac":0.2,"prompt":"Describe life in one word.","chosen":"Growth","rejected":"Dynamic"}
+{"user_id":"user1","user_llm_usage":"Less than one a year","sample_frac":0.2,"prompt":"Describe life in one word.","chosen":"Growth","rejected":"Dynamic"}

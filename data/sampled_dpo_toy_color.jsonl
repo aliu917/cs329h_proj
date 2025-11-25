@@ -1,0 +1,6 @@
+{"user_id":"user0","user_llm_usage":"Every day","sample_frac":1.0,"prompt":"Pick a color.","chosen":"Red","rejected":"Blue"}
+{"user_id":"user0","user_llm_usage":"Every day","sample_frac":1.0,"prompt":"Pick a color.","chosen":"Red","rejected":"Blue"}
+{"user_id":"user0","user_llm_usage":"Every day","sample_frac":1.0,"prompt":"Pick a color.","chosen":"Red","rejected":"Blue"}
+{"user_id":"user0","user_llm_usage":"Every day","sample_frac":1.0,"prompt":"Pick a color.","chosen":"Red","rejected":"Blue"}
+{"user_id":"user0","user_llm_usage":"Every day","sample_frac":1.0,"prompt":"Pick a color.","chosen":"Red","rejected":"Blue"}
+{"user_id":"user1","user_llm_usage":"Less than one a year","sample_frac":0.2,"prompt":"Pick a color.","chosen":"Yellow","rejected":"Blue"}
