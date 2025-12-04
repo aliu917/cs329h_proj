@@ -22,7 +22,7 @@ The conda environment dependencies are provided in `requirements.txt` and the on
 ├── data_processing.py              # Data preprocessing and sampling utilities
 ├── util.py                         # Utility functions (seeding)
 │
-├── run.py                          # Main training script
+├── run.py                          # Main training script (for local testing, not used)
 ├── eval_ipw.py                     # Evaluation script using BERT similarity
 │
 ├── run.ipynb                       # Full training workflow notebook
@@ -79,80 +79,44 @@ python data_processing.py
 This script will:
 1. Download the PRISM alignment dataset (`HannahRoseKirk/prism-alignment`)
 2. Process user preferences into DPO preference pairs
-3. Create two datasets:
-   - `data/all_dpo_dataset.jsonl`: All available preference pairs
-   - `data/sampled_dpo_dataset.jsonl`: IPS-weighted sampled dataset based on user LLM usage frequency
-
-**IPS Sampling Strategy:**
-- Users who use LLMs "Every day": 100% sampling rate (weight = 1.0)
-- "Every week": 80% sampling rate (weight = 0.8)
-- "More than once a month": 60% sampling rate (weight = 0.6)
-- "Once per month": 40% sampling rate (weight = 0.4)
-- "Less than once a year": 20% sampling rate (weight = 0.2)
-
-Optional: Create filtered datasets with specific user counts:
-```python
-from data_processing import run_filter, create_val_set
-
-# Filter to first 200 users
-run_filter("data/all_dpo_dataset.jsonl", "data/all_dpo_dataset_200.jsonl", max_user_id=200)
-run_filter("data/sampled_dpo_dataset.jsonl", "data/sampled_dpo_dataset_200.jsonl", max_user_id=200)
-
-# Create validation set
-create_val_set("data/all_dpo_dataset.jsonl", val_count=200)
-```
+3. Create a few datasets:
+   - `data/all_dpo_dataset.jsonl`: All available preference pairs (and a reduced first 200 user filtered version)
+   - `data/sampled_dpo_dataset.jsonl`: IPS-weighted sampled dataset based on user LLM usage frequency (and a reduced first 200 user filtered version)
+   - `data/all_dpo_dataset_val_200.jsonl`: a sample of 200 rows from the unsampled dataset for validation
 
 ### Step 2: Training Models
 
-There are three experimental conditions to reproduce:
+For toy models, the following three colab notebooks contain the runs and output results for each experiment:
+1. Baseline (no IPS, all data): run_toy.ipynb
 
-Run the training notebooks in order:
+2. With IPS weighting: `run_toy_ips.ipynb`
 
-1. **Baseline (no IPS, all data):**
-   ```bash
-├── jupyter notebook run_toy.ipynb
-   ```
+3. Without IPS weighting (sampled data): `run_toy_noips.ipynb`
 
-2. **With IPS weighting:**
-   ```bash
-├── jupyter notebook run_toy_ips.ipynb
-   ```
-
-3. **Without IPS weighting (sampled data):**
-   ```bash
-├── jupyter notebook run_toy_noips.ipynb
-   ```
-
-**Training Configuration:**
-- Model: `google/gemma-2-2b-it`
-- Batch size: 4
-- Learning rate: 2e-6
-- Epochs: 3
-- Beta (KL penalty): 1
-- Max sequence length: 512
-- LoRA for parameter-efficient fine-tuning
-
-Models are automatically saved to Weights & Biases every 5 epochs.
+For actual PRISM user data training, run the following colab: `run.ipynb`
+- To run the different experiment variations, modify the default_config in the following ways:
+  - all: `ips: False, sample: False`
+  - ips: `ips: True, sample: True`
+  - noips: `ips: False, sample: True`
+- For each new run, it is recommended to rename the `run_name` so that it will save in a distinct directory and artifact path on wandb.
+- Models are automatically saved to Weights & Biases every 5 epochs.
 
 ### Step 3: Generate Model Outputs
 
-After training, generate responses from each model on the validation set using the evaluation notebooks:
-
-```bash
-# Generate outputs from each trained model
-jupyter notebook eval_test_all.ipynb    # Model trained on all data
-jupyter notebook eval_test_ips.ipynb    # Model trained with IPS
-jupyter notebook eval_test_noips.ipynb  # Model trained without IPS
-```
+After training, generate responses from each model on the validation set. The following notebooks contain the results of evaluation for the three models trained using full DPO on the PRISM dataset above:
+- `eval_test_all.ipynb`: Model trained on all data
+- `eval_test_ips.ipynb`: Model trained with IPS
+- `eval_test_noips.ipynb`: Model trained without IPS
+Note that to reproduce these results with a new run, you will need to update the artifact path to point to the saved wandb artifact from a new training run. The artifact paths will depend on the run name and desired version number chosen from the results of the training colab run in step 2 above.
 
 These notebooks will:
-1. Load the fine-tuned model from wandb artifacts
+1. Load the fine-tuned model from wandb artifacts (will need to be updated to point to the appropriate saved artifact on wandb)
 2. Generate responses for validation prompts
 3. Save outputs to `out/gen_result*.jsonl`
 
 ### Step 4: Evaluate Results
 
-Run the evaluation script to compare model outputs:
+Run the evaluation script to compare model outputs. This can be done locally as it does not require using a GPU:
 
 ```bash
 python eval_ipw.py
@@ -177,58 +141,16 @@ Review the results in the output directory:
 
 ### Hardware Requirements
 
-**Minimum:**
-- GPU: NVIDIA GPU with 16GB VRAM (e.g., Tesla T4, RTX 4060 Ti)
-- RAM: 16GB system memory
-- Storage: 20GB free space (for models, data, and outputs)
-
-**Recommended:**
-- GPU: NVIDIA GPU with 24GB+ VRAM (e.g., RTX 3090, A5000, V100)
-- RAM: 32GB system memory
-- Storage: 50GB free space
-
-**Alternative:**
-- Apple Silicon (M1/M2/M3) with 16GB+ unified memory (will use MPS backend)
+All training runs were done using a L4 TPU on Google Colab. Either L4 TPU or A100 will work as the models need at least 22GB RAM in order to complete the 5 training epochs.
 
 ### Expected Runtimes
 
-Training times depend heavily on hardware and dataset size:
+**Training (all run-.ipynb files):**
 
-**Full Dataset (~50K examples):**
-- GPU (V100/A100): ~4-6 hours per epoch → 12-18 hours total (3 epochs)
-- GPU (T4/RTX 3090): ~8-12 hours per epoch → 24-36 hours total
-- Apple M1/M2: ~12-20 hours per epoch → 36-60 hours total
+Training times for the toy dataset experiments were pretty reasonable, within 15-30 minutes using the L4 TPUs. For the full PRISM dataset, running on the entire train set was unreasonable (tqdm quoted 20+ hours) so I ran on a filtered subset for the first 200 users and it took around 5-6 hrs for the full (all) model training and 3-4 hours for the sampled (IPS and no IPS) model training.
 
-**Filtered Dataset (200 users, ~8K examples):**
-- GPU (V100/A100): ~45-60 minutes per epoch → 2-3 hours total
-- GPU (T4/RTX 3090): ~1.5-2 hours per epoch → 4-6 hours total
-- Apple M1/M2: ~2-3 hours per epoch → 6-9 hours total
-
-**Toy Datasets (<50 examples):**
-- Any GPU: ~5-10 minutes per epoch → 15-30 minutes total
-- Apple M1/M2: ~10-15 minutes per epoch → 30-45 minutes total
-
-**Inference & Evaluation:**
-- Generating outputs for 200 validation samples: ~15-30 minutes per model
-- Computing BERT similarity scores: ~5-10 minutes
-
-**Total Time to Reproduce All Results:**
-- Using toy datasets: ~2-3 hours
-- Using filtered dataset (200 users): ~15-20 hours
-- Using full dataset: ~80-120 hours
-
-### Memory Usage
-
-- Model loading (Gemma-2-2b with LoRA): ~6-8GB VRAM
-- Training (batch size 4): ~12-14GB VRAM
-- Peak memory during training: ~16GB VRAM
-- Evaluation: ~8-10GB VRAM
-
-**Memory Optimization Tips:**
-- Reduce batch size if OOM errors occur (modify `batch_size` in `run.py`)
-- Use gradient accumulation for effective larger batches
-- Use bfloat16 precision (already implemented)
-- Enable CPU offloading with `device_map='auto'` (already implemented)
+**Inference (all eval-.ipynb files):**
+For inference, I used the T4 GPUs. Inference took around 30mins to an hour.
 
 ## Required Datasets and Data Sources
 
@@ -240,94 +162,6 @@ Training times depend heavily on hardware and dataset size:
 - Files used:
   - `utterances.jsonl`: User prompts, model responses, and preference labels
   - `survey.jsonl`: User demographics including LLM usage frequency
-- License: Check dataset page for license information
 - URL: https://huggingface.co/datasets/HannahRoseKirk/prism-alignment
 
 The dataset is automatically downloaded when running `data_processing.py`.
-
-### Manual Data Generation (Optional)
-
-If you want to use custom data instead of PRISM:
-
-1. Create a JSONL file with the following format:
-```json
-{
-  "user_id": "user0",
-  "user_llm_usage": "Every day",
-  "sample_frac": 1.0,
-  "prompt": "What is the capital of France?",
-  "chosen": "The capital of France is Paris.",
-  "rejected": "I don't know."
-}
-```
-
-2. Save to `data/custom_dataset.jsonl`
-
-3. Modify `run.py` line 108-110 to point to your custom dataset:
-```python
-path = "data/custom_dataset.jsonl"
-```
-
-### Pre-trained Model
-
-**Base Model: Gemma-2-2b-it**
-- Source: Google via HuggingFace
-- Model ID: `google/gemma-2-2b-it`
-- Access: Requires HuggingFace account and acceptance of model terms
-- URL: https://huggingface.co/google/gemma-2-2b-it
-
-To get access:
-1. Visit the model page on HuggingFace
-2. Accept the terms and conditions
-3. Generate an access token with read permissions
-4. Set the token as an environment variable (see Environment Setup)
-
-### Output Data
-
-Trained models and results are stored in:
-- **Weights & Biases**: Model checkpoints and training metrics
-  - Project name: `dpo-finetune`
-  - Artifacts: `dpo_model_{epoch}`
-- **Local `out/` directory**: Generated responses and evaluation results
-
-## Troubleshooting
-
-### Common Issues
-
-1. **CUDA Out of Memory**
-   - Reduce batch_size in run.py (line 18)
-   - Use smaller dataset variant (toy datasets)
-   - Enable gradient checkpointing
-
-2. **HuggingFace Authentication Error**
-   - Ensure HUGGINGFACE_TOKEN is set correctly
-   - Verify token has read access
-   - Accept Gemma model terms on HuggingFace
-
-3. **Slow Training on CPU**
-   - Training on CPU is not recommended
-   - Use Google Colab with GPU runtime
-   - Use cloud GPU instances (AWS, GCP, Lambda Labs)
-
-4. **Import Errors**
-   - Verify all packages in requirements_colab.txt are installed
-   - Check Python version (3.8+ required)
-   - Try creating a fresh virtual environment
-
-## Citation
-
-If you use this code or the PRISM dataset, please cite:
-
-```
-PRISM Alignment Dataset:
-@article{kirk2024prism,
-  title={The PRISM Alignment Dataset},
-  author={Kirk, Hannah Rose and others},
-  journal={arXiv preprint},
-  year={2024}
-}
-```
-
-## Contact
-
-For questions or issues related to this code, please open an issue in the repository or contact the course staff for CS329H.
