@@ -117,4 +117,4 @@ if __name__ == '__main__':
     # create_train_data()
     # filter_user_data("data/all_dpo_dataset.jsonl")
     # run_filter("data/sampled_dpo_dataset.jsonl", "data/sampled_dpo_dataset_200.jsonl")
-    create_val_set("data/all_dpo_dataset.jsonl")
+    create_val_set("data/all_dpo_dataset.jsonl", 200)
