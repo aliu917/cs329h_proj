@@ -21,6 +21,7 @@ numexpr
 numpy
 packaging
 pandas
+matplotlib
 peft==0.13.2
 pillow
 protobuf==5.29.5

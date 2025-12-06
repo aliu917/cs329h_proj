@@ -1,0 +1,4 @@
+Overall Accuracy: 0.551724 (96/174)
+Avg IPS Score: 0.934492
+Avg NoIPS Score: 0.925046
+Total Samples: 212

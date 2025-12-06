@@ -1,3 +1,10 @@
+"""
+Main training script for DPO fine-tuning.
+
+This script initializes models, loads datasets, and orchestrates the DPO fine-tuning
+process with optional IPS weighting. Supports training on CPU, CUDA, or Apple MPS.
+"""
+
 import argparse
 import sys
 
@@ -46,22 +53,23 @@ ref_model = AutoModelForCausalLM.from_pretrained(
 )
 ref_model.eval()
 
-# def dpo_collate(batch):
-#     batch_out = {}
-#
-#     for key in ["chosen", "rejected"]:
-#         batch_out[key] = tokenizer.pad(
-#             [item[key] for item in batch],
-#             padding=True,
-#             return_tensors="pt"
-#         )
-#
-#     # Logging metadata is a list (no padding)
-#     batch_out["metadata"] = [item["metadata"] for item in batch]
-#
-#     return batch_out
-
 def dpo_collate(batch, tokenizer, add_generation_prompt=False):
+    """
+    Collate function for batching DPO training samples.
+
+    Applies chat templates to prompts and responses, tokenizes them, and pads
+    to create uniform batch tensors.
+
+    Args:
+        batch (list): List of dictionaries containing prompt, chosen_text, and rejected_text.
+        tokenizer: HuggingFace tokenizer with chat template support.
+        add_generation_prompt (bool): Whether to add generation prompt. Defaults to False.
+
+    Returns:
+        dict: Dictionary with keys:
+            - chosen: Padded tensor batch for preferred responses
+            - rejected: Padded tensor batch for non-preferred responses
+    """
     chosen_texts = [
         [{"role": "user", "content": item["prompt"]},
          {"role": "assistant", "content": item["chosen_text"]}]
@@ -92,6 +100,16 @@ def dpo_collate(batch, tokenizer, add_generation_prompt=False):
     }
 
 def train(path, wandb):
+    """
+    Run the DPO training loop.
+
+    Loads the dataset, creates a dataloader, and runs fine-tuning with the specified
+    configuration from wandb.
+
+    Args:
+        path (str): Path to the JSONL dataset file.
+        wandb: Weights & Biases run object containing configuration.
+    """
     dataset = DpoJsonlDataset(path, tokenizer=tokenizer, max_length=wandb.config.max_seq_length)
     dataloader = DataLoader(dataset, batch_size=wandb.config.batch_size, shuffle=True, num_workers=0, collate_fn=lambda batch: dpo_collate(batch, tokenizer))
     optimizer = torch.optim.Adam(train_model.parameters(), lr=wandb.config.learning_rate)

@@ -1,3 +1,10 @@
+"""
+Data processing utilities for creating DPO datasets from PRISM alignment data.
+
+This module handles downloading the PRISM alignment dataset, processing user preferences
+into DPO format, and implementing inverse propensity scoring based on user LLM usage frequency.
+"""
+
 import json
 from collections import defaultdict
 import random
@@ -17,6 +24,20 @@ LLM_USAGE_MAPPING = {
 
 
 def write_data(user_id, user_llm_usage, sample_frac, prompt, label_ouptuts, f):
+    """
+    Write preference pairs to JSONL file.
+
+    Creates all possible combinations of chosen/rejected response pairs for a given
+    prompt and writes them to the output file in JSONL format.
+
+    Args:
+        user_id (str): Unique identifier for the user.
+        user_llm_usage (str): User's LLM usage frequency (e.g., "Every day").
+        sample_frac (float): Sampling probability based on usage frequency.
+        prompt (str): The user prompt/question.
+        label_ouptuts (dict): Dictionary with "chosen" and "rejected" response lists.
+        f (file): File handle to write JSONL output.
+    """
     for chosen in label_ouptuts["chosen"]:
         for rejected in label_ouptuts["rejected"]:
             json.dump(
@@ -34,6 +55,16 @@ def write_data(user_id, user_llm_usage, sample_frac, prompt, label_ouptuts, f):
             f.write("\n")
 
 def create_train_data():
+    """
+    Create DPO training datasets from the PRISM alignment dataset.
+
+    Downloads the PRISM alignment dataset from HuggingFace and processes it into two formats:
+    1. all_dpo_dataset.jsonl: All available preference pairs
+    2. sampled_dpo_dataset.jsonl: IPS-weighted sampled data based on user LLM usage frequency
+
+    The sampling strategy applies different rates based on how frequently users use LLMs,
+    with heavier users sampled more frequently to correct for selection bias.
+    """
     dataset = load_dataset(
         "json",
         data_files="hf://datasets/HannahRoseKirk/prism-alignment/utterances.jsonl",
@@ -71,6 +102,19 @@ def create_train_data():
 
 
 def filter_user_data(input_jsonl_path: str, max_user_id: int = 200) -> pd.DataFrame:
+    """
+    Filter dataset to include only users below a specified ID threshold.
+
+    Useful for creating smaller subsets of the data for faster experimentation
+    or when computational resources are limited.
+
+    Args:
+        input_jsonl_path (str): Path to input JSONL file.
+        max_user_id (int): Maximum user ID to include (exclusive). Defaults to 200.
+
+    Returns:
+        pd.DataFrame: Filtered dataframe with only users having ID < max_user_id.
+    """
     df = pd.read_json(input_jsonl_path, lines=True)
     print(f"Original number of rows: {len(df)}")
     initial_distribution = df['user_llm_usage'].value_counts(normalize=True) * 100
@@ -88,11 +132,29 @@ def filter_user_data(input_jsonl_path: str, max_user_id: int = 200) -> pd.DataFr
 
 
 def run_filter(input_path, output_path, max_user_id: int = 200):
+    """
+    Filter and save dataset to a new file.
+
+    Args:
+        input_path (str): Path to input JSONL file.
+        output_path (str): Path to save filtered JSONL file.
+        max_user_id (int): Maximum user ID to include. Defaults to 200.
+    """
     filtered_df = filter_user_data(input_path, max_user_id)
     filtered_df.to_json(output_path, orient='records', lines=True)
 
 
 def create_val_set(input_path, val_count=100):
+    """
+    Create a validation set by randomly sampling from the dataset.
+
+    Samples validation examples from users with ID >= 200 to ensure separation
+    from training data when using filtered datasets.
+
+    Args:
+        input_path (str): Path to input JSONL file.
+        val_count (int): Number of validation samples to create. Defaults to 100.
+    """
     df = pd.read_json(input_path, lines=True)
     indices = random.sample(range(200, len(df)), val_count)
 
@@ -105,6 +167,14 @@ def create_val_set(input_path, val_count=100):
 
 
 def count_df(input_path):
+    """
+    Print statistics about the dataset.
+
+    Displays the number of rows and sum of inverse propensity scores.
+
+    Args:
+        input_path (str): Path to JSONL file to analyze.
+    """
     df = pd.read_json(input_path, lines=True)
     print(f"Original number of rows: {len(df)}")
 

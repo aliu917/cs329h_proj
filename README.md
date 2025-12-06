@@ -6,9 +6,10 @@ This project implements Direct Preference Optimization (DPO) fine-tuning for lan
 
 The conda environment dependencies are provided in `requirements.txt` and the one used in colab is `requirements_colab.txt` (they are the same). In addition to the requirements, we assume the following prerequisites:
 - Python 3.8+
-- CUDA-compatible GPU (all training is run on Google Colab by uploading the entire directory to Google Drive)
-- HuggingFace account and API token
+- Google Colab: all training and ipynb are set up to run on Google Colab by uploading the entire directory to Google Drive and mounting the notebook to the code folder
+- HuggingFace account and API token (for accessing Gemma model and PRISM dataset)
 - Weights & Biases (wandb) account for experiment tracking
+- OpenAI API key (for LLM-as-judge evaluation in `eval_ipw.py`)
 
 ## Repository Structure
 
@@ -23,7 +24,7 @@ The conda environment dependencies are provided in `requirements.txt` and the on
 ├── util.py                         # Utility functions (seeding)
 │
 ├── run.py                          # Main training script (for local testing, not used)
-├── eval_ipw.py                     # Evaluation script using BERT similarity
+├── eval_ipw.py                     # Evaluation script with BERT similarity and LLM-as-judge
 │
 ├── run.ipynb                       # Full training workflow notebook
 ├── run_toy.ipynb                   # Toy example training (baseline)
@@ -43,7 +44,7 @@ The conda environment dependencies are provided in `requirements.txt` and the on
 │
 ├── out/                            # Output directory
 │   ├── gen_result*.jsonl          # Generated model responses
-│   └── logs/                      # Evaluation results and metrics
+│   └── results/                   # Evaluation results and metrics
 │
 └── wandb/                          # Weights & Biases logs
 ```
@@ -59,12 +60,15 @@ The conda environment dependencies are provided in `requirements.txt` and the on
 - `data_processing.py`: Creates DPO training datasets from the PRISM alignment dataset, implements IPS sampling based on user LLM usage frequency
 
 **Evaluation:**
-- `eval_ipw.py`: Evaluates models by comparing BERT similarity scores between different model outputs
+- `eval_ipw.py`: Evaluates models using two methods:
+  - BERT similarity: Compares semantic similarity of model outputs to gold standard
+  - LLM-as-judge: Uses GPT to score responses based on user's historical preferences
+  - Both methods calculate overall accuracy and per-group breakdowns by user LLM usage frequency
 
 **Notebooks:**
 - `run.ipynb`: This is the full DPO training workflow, used to train the DPO models. This colab is modified for the different all, IPS, and noIPS configurations by updating the `default_config` variable's "ips" and "sample" parameters to determine if ips should be used or not (True/False) and if we should sample from the datsaet or not (True = ips/noips, False=all).
 - `run_toy*.ipynb`: This is an adaptation of the `run.ipynb` file for just a single toy dataset. The different variation show the results from ips and noips for their respective training styles to store the outputs.
-- `eval_test*.ipynb`: Interactive evaluation and analysis of trained models. The outputs of each model (all/ips/noips) are provided in the ipynb file outputs.
+- `eval_test*.ipynb`: Interactive evaluation and analysis of trained models. The outputs of running eval for each model (all/ips/noips) are provided in the ipynb file outputs and the generated results are saved in `out/gen_result*_fixtemplate.jsonl`.
 
 ## Step-by-Step Guide to Reproduce Results
 
@@ -116,32 +120,52 @@ These notebooks will:
 
 ### Step 4: Evaluate Results
 
-Run the evaluation script to compare model outputs. This can be done locally as it does not require using a GPU:
+Run the evaluation script to compare model outputs using two complementary methods:
 
 ```bash
 python eval_ipw.py
 ```
 
-This script:
+**Note:** The LLM-as-judge evaluation requires an OpenAI API key set in your environment:
+```bash
+export OPENAI_API_KEY="your_api_key_here"
+```
+
+This script performs two types of evaluation:
+
+#### 4a. BERT Similarity Evaluation
 1. Loads generated outputs from all three models
-2. Computes BERT similarity scores between the "all data" model (gold standard) and the IPS/no-IPS models
-3. Calculates accuracy: percentage of cases where IPS model is closer to the gold standard than no-IPS model
-4. Saves results to `out/logs/run1/`
-   - `similarity_results.csv`: Detailed per-sample scores
-   - `result.txt`: Overall accuracy metric
+2. Computes BERT semantic similarity scores between the "all data" model (gold standard) and the IPS/no-IPS models
+3. Calculates accuracy: percentage of cases where IPS model output is more similar to the gold standard than no-IPS model
+4. Saves results to `out/results/{run_name}/`:
+   - `similarity_results.csv`: Detailed per-sample scores with user metadata
+   - `similarity_result.txt`: Overall accuracy and average scores
+   - `similarity_grouped_results.txt`: Breakdown by user LLM frequency groups
+
+#### 4b. LLM-as-Judge Evaluation
+1. Loads user's historical scores from PRISM utterances dataset
+2. For each response, queries GPT-4o-mini to score both IPS and no-IPS outputs (1-100 scale)
+3. GPT scoring is calibrated using the user's previous ratings for the same prompt
+4. Calculates accuracy: percentage of cases where IPS model gets a higher score than no-IPS model
+5. Saves results to `out/results/{run_name}/`:
+   - `llmjudge_results.csv`: Detailed per-sample scores with user metadata
+   - `llmjudge_result.txt`: Overall accuracy and average scores
+   - `llmjudge_grouped_results.txt`: Breakdown by user LLM frequency groups
 
 ### Step 5: Analysis
 
 Review the results in the output directory:
 - Compare training curves in Weights & Biases dashboard
-- Analyze similarity scores in `out/logs/run1/similarity_results.csv`
-- Examine the overall accuracy metric in `out/logs/run1/result.txt`
+- Analyze detailed scores in `out/results/{run_name}/similarity_results.csv` and `llmjudge_results.csv`
+- Examine overall metrics in `*_result.txt` files
+- Review grouped breakdowns in `*_grouped_results.txt` to see how IPS weighting performs across different user segments
+- Compare BERT similarity vs LLM-as-judge evaluations to understand model performance from different perspectives
 
 ## Expected Runtime and Computational Requirements
 
 ### Hardware Requirements
 
-All training runs were done using a L4 TPU on Google Colab. Either L4 TPU or A100 will work as the models need at least 22GB RAM in order to complete the 5 training epochs.
+All training runs (run*.ipynb files) were done using a L4 TPU on Google Colab. Either L4 TPU or A100 will work as the models need at least 22GB RAM in order to complete the 5 training epochs.
 
 ### Expected Runtimes
 
@@ -150,18 +174,22 @@ All training runs were done using a L4 TPU on Google Colab. Either L4 TPU or A10
 Training times for the toy dataset experiments were pretty reasonable, within 15-30 minutes using the L4 TPUs. For the full PRISM dataset, running on the entire train set was unreasonable (tqdm quoted 20+ hours) so I ran on a filtered subset for the first 200 users and it took around 5-6 hrs for the full (all) model training and 3-4 hours for the sampled (IPS and no IPS) model training.
 
 **Inference (all eval-.ipynb files):**
-For inference, I used the T4 GPUs. Inference took around 30mins to an hour.
+For inference, I used the T4 GPUs. Inference took around 30mins to an hour for each notebook.
+
+**Evaluation (eval_ipw.py):**
+- BERT Similarity: < 5 minutes for 200 samples (runs locally, no GPU needed)
+- LLM-as-Judge: < 10 minutes for 200 samples (runs locally using OpenAI API, no GPU needed)
 
 ## Required Datasets and Data Sources
-
-### Primary Dataset
 
 **PRISM Alignment Dataset**
 - Source: HuggingFace Datasets Hub
 - Dataset ID: `HannahRoseKirk/prism-alignment`
 - Files used:
-  - `utterances.jsonl`: User prompts, model responses, and preference labels
-  - `survey.jsonl`: User demographics including LLM usage frequency
+  - `utterances.jsonl`: User prompts, model responses, preference labels, and numerical scores (1-100)
+    - Used for creating DPO training data and calibrating LLM-as-judge evaluations
+  - `survey.jsonl`: User demographics including LLM usage frequency (`lm_frequency_use`)
+    - Used for IPS sampling weights and grouped metric analysis
 - URL: https://huggingface.co/datasets/HannahRoseKirk/prism-alignment
 
-The dataset is automatically downloaded when running `data_processing.py`.
+The dataset is automatically downloaded when running `data_processing.py` and `eval_ipw.py`.

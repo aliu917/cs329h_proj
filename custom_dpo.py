@@ -1,10 +1,27 @@
-# Code is adapted from hw1
+"""
+Direct Preference Optimization (DPO) training implementation.
+
+This module implements the core DPO algorithm for fine-tuning language models
+based on preference data. Code is adapted from CS329H homework assignments.
+"""
+
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 
 
 def get_logprobs(model, input_ids, attention_mask):
+    """
+    Compute log probabilities for each token in a sequence.
+
+    Args:
+        model: The language model to compute probabilities with.
+        input_ids (torch.Tensor): Token IDs of shape (batch_size, seq_len).
+        attention_mask (torch.Tensor): Attention mask of shape (batch_size, seq_len).
+
+    Returns:
+        torch.Tensor: Log probabilities for each token of shape (batch_size, seq_len).
+    """
     outputs = model(
         input_ids=input_ids,
         attention_mask=attention_mask,
@@ -49,19 +66,23 @@ def compute_dpo_objective(preferred_train_logprobs, nonpreferred_train_logprobs,
 
 def dpo_step(train_model, ref_model, preferred_chat_ids, nonpreferred_chat_ids, preferred_mask, nonpreferred_mask, beta, ips_weight):
     """
-    Fine-tunes the training model using DPO. Make sure to disable gradients on the reference model!
+    Perform a single DPO training step.
+
+    Computes the DPO loss for a batch of preference pairs and returns the loss.
+    Gradients on the reference model are automatically disabled.
 
     Args:
-    optimizer: The optimizer for updating the training model's parameters.
-    train_model: The model being fine-tuned.
-    ref_model: The reference model.
-    preferred_chat_ids (list[int]): The token IDs representing the preferred chat sequence.
-    nonpreferred_chat_ids (list[int]): The token IDs representing the non-preferred chat sequence.
-    num_gradient_steps (int): The number of gradient updates to perform.
-    beta (float): A parameter used in computing the DPO objective.
+        train_model: The model being fine-tuned.
+        ref_model: The reference model (frozen).
+        preferred_chat_ids (torch.Tensor): Token IDs for preferred responses.
+        nonpreferred_chat_ids (torch.Tensor): Token IDs for non-preferred responses.
+        preferred_mask (torch.Tensor): Attention mask for preferred responses.
+        nonpreferred_mask (torch.Tensor): Attention mask for non-preferred responses.
+        beta (float): Temperature parameter controlling KL divergence penalty.
+        ips_weight (torch.Tensor, optional): Inverse propensity scores for weighting samples.
 
     Returns:
-    dpo loss
+        torch.Tensor: Scalar DPO loss value.
     """
     preferred_train_logprobs = get_logprobs(train_model, preferred_chat_ids, preferred_mask)
     nonpreferred_train_logprobs = get_logprobs(train_model, nonpreferred_chat_ids, nonpreferred_mask)
@@ -76,6 +97,25 @@ def dpo_step(train_model, ref_model, preferred_chat_ids, nonpreferred_chat_ids, 
 
 
 def finetune(wandb, optimizer, train_model, ref_model, dataloader, beta, num_epochs, use_ips=False):
+    """
+    Fine-tune a model using Direct Preference Optimization.
+
+    Trains the model over multiple epochs, optionally using inverse propensity scoring
+    for bias correction. Logs metrics to Weights & Biases and saves model checkpoints.
+
+    Args:
+        wandb: Weights & Biases run object for logging.
+        optimizer: PyTorch optimizer for updating model parameters.
+        train_model: The model to be fine-tuned.
+        ref_model: The frozen reference model for computing DPO loss.
+        dataloader: DataLoader providing batches of preference pairs.
+        beta (float): Temperature parameter for DPO loss.
+        num_epochs (int): Number of training epochs.
+        use_ips (bool, optional): Whether to use inverse propensity scoring. Defaults to False.
+
+    Returns:
+        None. Model is updated in-place and checkpoints are logged to wandb.
+    """
     train_model.train()
     ref_model.eval()
 
