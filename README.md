@@ -1,12 +1,12 @@
-# DPO Fine-tuning with Inverse Propensity Scoring (IPS)
+# DPO Fine-tuning with Inverse Propensity Weighting (IPW)
 
-This project implements Direct Preference Optimization (DPO) fine-tuning for language models with optional Inverse Propensity Scoring (IPS) weighting. The code fine-tunes Google's Gemma-2-2b-it model on the PRISM alignment dataset and compares performance between models trained with IPS weighting, without IPS weighting, and using all available data.
+This project implements IPW Direct Preference Optimization (DPO) fine-tuning for language models and runs experiments and evaluations. The code fine-tunes Google's Gemma-2-2b-it model on the PRISM alignment dataset and compares performance between models trained with IPS weighting, without IPS weighting, and using all unbiased data.
 
 ## Environment Setup and Dependencies
 
-The conda environment dependencies are provided in `requirements.txt` and the one used in colab is `requirements_colab.txt` (they are the same). In addition to the requirements, we assume the following prerequisites:
+The conda environment dependencies are provided in `environment.yml` and the one used in colab is `requirements_colab.txt`. In addition to the requirements, we assume the following prerequisites:
 - Python 3.8+
-- Google Colab: all training and ipynb are set up to run on Google Colab by uploading the entire directory to Google Drive and mounting the notebook to the code folder
+- Google Colab: all training and ipynb are set up to run on Google Colab by uploading the entire directory to Google Drive and mounting the notebook to the code folder.
 - HuggingFace account and API token (for accessing Gemma model and PRISM dataset)
 - Weights & Biases (wandb) account for experiment tracking
 - OpenAI API key (for LLM-as-judge evaluation in `eval_ipw.py`)
@@ -16,7 +16,8 @@ The conda environment dependencies are provided in `requirements.txt` and the on
 ```
 .
 ├── README.md                       # This file
-├── requirements_colab.txt          # Python dependencies
+├── requirements_colab.txt          # Python dependencies for running Colab training
+├── environment.yml                 # Conda environment for running data processing, training, and eval locally
 │
 ├── custom_dpo.py                   # Core DPO training implementation
 ├── dpo_dataset.py                  # Dataset loader for DPO training
@@ -24,27 +25,27 @@ The conda environment dependencies are provided in `requirements.txt` and the on
 ├── util.py                         # Utility functions (seeding)
 │
 ├── run.py                          # Main training script (for local testing, not used)
-├── eval_ipw.py                     # Evaluation script with BERT similarity and LLM-as-judge
+├── eval_ipw.py                     # Eval script for BERT similarity and LLM-as-judge (uses results from out/ folder)
 │
-├── run.ipynb                       # Full training workflow notebook
-├── run_toy.ipynb                   # Toy example training (baseline)
+├── run.ipynb                       # Full training workflow notebook for entire PRISM dataset training
+├── run_toy.ipynb                   # Toy example training (all unbiased training)
 ├── run_toy_ips.ipynb               # Toy example training (with IPS)
 ├── run_toy_noips.ipynb             # Toy example training (without IPS)
 │
-├── eval_test_all.ipynb             # Evaluation notebook (all data model)
-├── eval_test_ips.ipynb             # Evaluation notebook (IPS model)
-├── eval_test_noips.ipynb           # Evaluation notebook (no-IPS model)
+├── eval_test_all.ipynb             # Notebook for inference outputs (using checkpoint of all data model)
+├── eval_test_ips.ipynb             # Notebook for inference outputs (using checkpoint of IPS model)
+├── eval_test_noips.ipynb           # Notebook for inference outputs (using checkpoint of no-IPS model)
 │
 ├── data/                           # Dataset directory
 │   ├── all_dpo_dataset.jsonl      # Full DPO dataset
 │   ├── sampled_dpo_dataset.jsonl  # IPS-weighted sampled dataset
 │   ├── *_200.jsonl                # Filtered datasets (first 200 users)
 │   ├── *_val_*.jsonl              # Validation sets
-│   └── *_toy*.jsonl               # Small toy datasets for testing
+│   └── *_toy*.jsonl               # Various small toy datasets used for experimenting with the toy model
 │
 ├── out/                            # Output directory
-│   ├── gen_result*.jsonl          # Generated model responses
-│   └── results/                   # Evaluation results and metrics
+│   ├── gen_result*.jsonl          # Generated model responses (used the *fixtemplate ones)
+│   └── results/                   # Evaluation results (final report results from the run_grouped_graph folder)
 │
 └── wandb/                          # Weights & Biases logs
 ```
@@ -68,7 +69,7 @@ The conda environment dependencies are provided in `requirements.txt` and the on
 **Notebooks:**
 - `run.ipynb`: This is the full DPO training workflow, used to train the DPO models. This colab is modified for the different all, IPS, and noIPS configurations by updating the `default_config` variable's "ips" and "sample" parameters to determine if ips should be used or not (True/False) and if we should sample from the datsaet or not (True = ips/noips, False=all).
 - `run_toy*.ipynb`: This is an adaptation of the `run.ipynb` file for just a single toy dataset. The different variation show the results from ips and noips for their respective training styles to store the outputs.
-- `eval_test*.ipynb`: Interactive evaluation and analysis of trained models. The outputs of running eval for each model (all/ips/noips) are provided in the ipynb file outputs and the generated results are saved in `out/gen_result*_fixtemplate.jsonl`.
+- `eval_test*.ipynb`: Notebook to generate model inference outputs. The outputs of running inference for each model (all/ips/noips) on the eval set are provided in the ipynb file outputs and the generated results are saved in `out/gen_result*_fixtemplate.jsonl`.
 
 ## Step-by-Step Guide to Reproduce Results
 
@@ -91,7 +92,7 @@ This script will:
 ### Step 2: Training Models
 
 For toy models, the following three colab notebooks contain the runs and output results for each experiment:
-1. Baseline (no IPS, all data): run_toy.ipynb
+1. Baseline (no IPS, all data): `run_toy.ipynb`
 
 2. With IPS weighting: `run_toy_ips.ipynb`
 
@@ -107,11 +108,11 @@ For actual PRISM user data training, run the following colab: `run.ipynb`
 
 ### Step 3: Generate Model Outputs
 
-After training, generate responses from each model on the validation set. The following notebooks contain the results of evaluation for the three models trained using full DPO on the PRISM dataset above:
+After training, generate responses from each model on the validation set. The following notebooks contain the results of funning inference for the three models on the PRISM dataset:
 - `eval_test_all.ipynb`: Model trained on all data
 - `eval_test_ips.ipynb`: Model trained with IPS
 - `eval_test_noips.ipynb`: Model trained without IPS
-Note that to reproduce these results with a new run, you will need to update the artifact path to point to the saved wandb artifact from a new training run. The artifact paths will depend on the run name and desired version number chosen from the results of the training colab run in step 2 above.
+Note that to reproduce these results with a new run, you will need to update the artifact path to point to the saved wandb artifact from a new training run. The artifact paths will depend on the run name and desired version number chosen from the wandb logged artifact results. I chose the version numbers based on the best performing validation loss value (IPW val for sampled IPS/no-IPS models, normal val for the all model)
 
 These notebooks will:
 1. Load the fine-tuned model from wandb artifacts (will need to be updated to point to the appropriate saved artifact on wandb)
@@ -135,12 +136,13 @@ This script performs two types of evaluation:
 
 #### 4a. BERT Similarity Evaluation
 1. Loads generated outputs from all three models
-2. Computes BERT semantic similarity scores between the "all data" model (gold standard) and the IPS/no-IPS models
-3. Calculates accuracy: percentage of cases where IPS model output is more similar to the gold standard than no-IPS model
+2. Computes BERT semantic similarity scores between the "all data" model (reference standard) and the IPS/no-IPS models
+3. Calculates accuracy: percentage of cases where IPS model output is more similar to the reference standard than no-IPS model
 4. Saves results to `out/results/{run_name}/`:
    - `similarity_results.csv`: Detailed per-sample scores with user metadata
    - `similarity_result.txt`: Overall accuracy and average scores
    - `similarity_grouped_results.txt`: Breakdown by user LLM frequency groups
+   - `similarity_grouped_chart.png`: Graphical output of the results by user LLM frequency groups
 
 #### 4b. LLM-as-Judge Evaluation
 1. Loads user's historical scores from PRISM utterances dataset
@@ -151,6 +153,7 @@ This script performs two types of evaluation:
    - `llmjudge_results.csv`: Detailed per-sample scores with user metadata
    - `llmjudge_result.txt`: Overall accuracy and average scores
    - `llmjudge_grouped_results.txt`: Breakdown by user LLM frequency groups
+   - `llmjudge_grouped_chart.png`: Graphical output of the results by user LLM frequency groups
 
 ### Step 5: Analysis
 
@@ -159,19 +162,19 @@ Review the results in the output directory:
 - Analyze detailed scores in `out/results/{run_name}/similarity_results.csv` and `llmjudge_results.csv`
 - Examine overall metrics in `*_result.txt` files
 - Review grouped breakdowns in `*_grouped_results.txt` to see how IPS weighting performs across different user segments
-- Compare BERT similarity vs LLM-as-judge evaluations to understand model performance from different perspectives
+- Compare BERT similarity vs LLM-as-judge evaluations to understand model performance
 
 ## Expected Runtime and Computational Requirements
 
 ### Hardware Requirements
 
-All training runs (run*.ipynb files) were done using a L4 TPU on Google Colab. Either L4 TPU or A100 will work as the models need at least 22GB RAM in order to complete the 5 training epochs.
+All training runs (run*.ipynb files) were done using a L4 GPU on Google Colab. Either L4 GPU or A100 will work as the models need at least 22GB RAM in order to complete the 5 training epochs.
 
 ### Expected Runtimes
 
 **Training (all run-.ipynb files):**
 
-Training times for the toy dataset experiments were pretty reasonable, within 15-30 minutes using the L4 TPUs. For the full PRISM dataset, running on the entire train set was unreasonable (tqdm quoted 20+ hours) so I ran on a filtered subset for the first 200 users and it took around 5-6 hrs for the full (all) model training and 3-4 hours for the sampled (IPS and no IPS) model training.
+Training times for the toy dataset experiments were pretty reasonable, within 15-30 minutes using the L4 GPUs. For the full PRISM dataset, running on the entire train set was unreasonable (tqdm quoted 20+ hours) so I ran on a filtered subset for the first 200 users and it took around 5-6 hrs for the full (all) model training and 3-4 hours for the sampled (IPS and no IPS) model training.
 
 **Inference (all eval-.ipynb files):**
 For inference, I used the T4 GPUs. Inference took around 30mins to an hour for each notebook.
@@ -193,3 +196,5 @@ For inference, I used the T4 GPUs. Inference took around 30mins to an hour for e
 - URL: https://huggingface.co/datasets/HannahRoseKirk/prism-alignment
 
 The dataset is automatically downloaded when running `data_processing.py` and `eval_ipw.py`.
+
+The sampled datasets created for response bias simulation are also provided in the code within the data/ directory as described in the file structure above.
